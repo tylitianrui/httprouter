@@ -17,6 +17,7 @@ func min(a, b int) int {
 	return b
 }
 
+// 最长匹配
 func longestCommonPrefix(a, b string) int {
 	i := 0
 	max := min(len(a), len(b))
@@ -65,20 +66,46 @@ func countParams(path string) uint16 {
 type nodeType uint8
 
 const (
-	static nodeType = iota // default
-	root
-	param
-	catchAll
+	static   nodeType = iota // 前缀树中，非根节点的普通节点
+	root                     //   前缀树中，根节点
+	param                    //   参数节点  例如/order/:oid  订单的id（:oid）
+	catchAll                 // 包含统配符的节点
 )
 
+// 前缀树中的节点
 type node struct {
-	path      string
+
+	// 就是路径 例如：/order/:oid
+	path string
+
+	/*
+		indices  wildChild 用于标明 前缀树某节点的子节点
+		如果某节点有子节点， /order/apple/:id
+		即order节点有apple子节点，apple子节点又有参数子节点:id
+		子节点可以抽象成两类，一个是不带参数的，也就是说但确定就不会改变了；
+		另一类就是参数节点，里面的值是可以变化的，例如：
+		/order/apple/1     /order/apple/1112  /order/apple/754
+		/order/apple/部分不变   id部分是可变的
+		注：此例子有些不恰当，为了方便说明。
+		所以需要对子节点进行划分，所以需要区分是否是参数节点
+		wildChild  false  某节点的孩子是不带参数的节点
+		wildChild  true   某节点的孩子是带参数的节点
+	*/
 	indices   string
-	wildChild bool
-	nType     nodeType
-	priority  uint32
-	children  []*node
-	handle    Handle
+	wildChild bool // 区分子节点是否是参数节点
+	/*
+		如果子节点是不带参数的节点，wildChild  false
+		indices 存储的是子节点的首字母
+
+
+
+	*/
+
+	// 节点的类型 默认为0  即前缀树中，非根节点的普通节点
+	nType    nodeType
+	priority uint32
+	children []*node
+	handle   Handle
 }
 
 // Increments priority of the given child and reorders if necessary
@@ -107,11 +134,14 @@ func (n *node) incrementChildPrio(pos int) int {
 
 // addRoute adds a node with the given handle to the path.
 // Not concurrency-safe!
+// 注意 非并发安全的！！！
+// node 就是前缀树的节点，例如：根节点、叶子节
 func (n *node) addRoute(path string, handle Handle) {
 	fullPath := path
 	n.priority++
 
 	// Empty tree
+	// 既没有path 又没有子节点，就认为是空树
 	if len(n.path) == 0 && len(n.indices) == 0 {
 		n.insertChild(path, fullPath, handle)
 		n.nType = root
@@ -215,6 +245,7 @@ walk:
 	}
 }
 
+// 插入一个子节点
 func (n *node) insertChild(path, fullPath string, handle Handle) {
 	for {
 		// Find prefix until first wildcard
@@ -241,6 +272,7 @@ func (n *node) insertChild(path, fullPath string, handle Handle) {
 				"' conflicts with existing children in path '" + fullPath + "'")
 		}
 
+		// 参数以 ：开始
 		if wildcard[0] == ':' { // param
 			if i > 0 {
 				// Insert prefix before the current wildcard

@@ -124,7 +124,18 @@ func ParamsFromContext(ctx context.Context) Params {
 
 // Router is a http.Handler which can be used to dispatch requests to different
 // handler functions via configurable routes
+
+// Router实现了http.Handler接口
+// type Handler interface {
+//	ServeHTTP(ResponseWriter, *Request)
+// }
 type Router struct {
+
+	// 思路是为每一个http的方法（get、post、put 等）创建一个前缀树
+	// trees 是这些前缀树根节点的map
+	// 例如 map["GET"]存储的是get方法前缀树的根节点
+	// map["POST"]存储的是POST方法前缀树的根节点
+
 	trees map[string]*node
 
 	paramsPool sync.Pool
@@ -214,6 +225,10 @@ func (r *Router) putParams(ps *Params) {
 	}
 }
 
+// Router实现的方法：GET ,POST, PUT等等，实际执行的都是
+// Router.Handle(http的方法, path, handle)
+// http的方法名是常量，定义在 http/method.go 文件内
+
 // GET is a shortcut for router.Handle(http.MethodGet, path, handle)
 func (r *Router) GET(path string, handle Handle) {
 	r.Handle(http.MethodGet, path, handle)
@@ -257,21 +272,35 @@ func (r *Router) DELETE(path string, handle Handle) {
 // This function is intended for bulk loading and to allow the usage of less
 // frequently used, non-standardized or custom methods (e.g. for internal
 // communication with a proxy).
+
+// 注册新的请求
+// 在restful风格内，不同的方法的uri可以相同的
+// 例如 restful风格： GET  /user 获取user信息； POST   /user 创建user
+// 所以需要 方法和路径标识一个唯一的请求
+// Handle的定义：  type Handle func(http.ResponseWriter, *http.Request, Params)
+// 与官方定义之处，就是增加了一个Params 参数
 func (r *Router) Handle(method, path string, handle Handle) {
+	// 校验参数
+	// 参数是必须的，否则panic
 	if method == "" {
 		panic("method must not be empty")
 	}
+	// path不能为空，并且必须以"/"开通
 	if len(path) < 1 || path[0] != '/' {
 		panic("path must begin with '/' in path '" + path + "'")
 	}
+	// handle不为空
 	if handle == nil {
 		panic("handle must not be nil")
 	}
-
+	// 在创建Router实例的时候，并没创建trees这个map，所以trees 默认值nil
+	//  键 New() 方法
 	if r.trees == nil {
+		//
 		r.trees = make(map[string]*node)
 	}
 
+	// 获取当前tree针对某方法（例如GET）的前缀树
 	root := r.trees[method]
 	if root == nil {
 		root = new(node)
