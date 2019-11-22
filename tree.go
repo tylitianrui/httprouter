@@ -52,6 +52,9 @@ func findWildcard(path string) (wilcard string, i int, valid bool) {
 	return "", -1, false
 }
 
+// 统计参数的格式
+// user/:id    id为参数
+//  user/*any   也统计在内
 func countParams(path string) uint16 {
 	var n uint
 	for i := range []byte(path) {
@@ -104,6 +107,8 @@ type node struct {
 	// 节点的类型 默认为0  即前缀树中，非根节点的普通节点
 	nType    nodeType
 	priority uint32
+
+	// 孩子节点的切片
 	children []*node
 	handle   Handle
 }
@@ -153,6 +158,8 @@ walk:
 		// Find the longest common prefix.
 		// This also implies that the common prefix contains no ':' or '*'
 		// since the existing key can't contain those chars.
+
+		// 最长前缀
 		i := longestCommonPrefix(path, n.path)
 
 		// Split edge

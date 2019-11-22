@@ -309,6 +309,7 @@ func (r *Router) Handle(method, path string, handle Handle) {
 		r.globalAllowed = r.allowed("*", "")
 	}
 
+	// 添加路径，即向前缀树中添加
 	root.addRoute(path, handle)
 
 	// Update maxParams
